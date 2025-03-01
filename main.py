@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from datetime import datetime
 
 class Ingredient:
@@ -26,7 +26,13 @@ class Inventory:
         self.ingredients = []
 
     def add_ingredient(self, ingredient):
-        self.ingredients.append(ingredient)
+        existing_ingredient = self.get_ingredient(ingredient.name)
+        if existing_ingredient:
+            existing_ingredient.update_amount(ingredient.current_amount)
+            existing_ingredient.prepped_by = ingredient.prepped_by
+            existing_ingredient.prep_time = ingredient.prep_time
+        else:
+            self.ingredients.append(ingredient)
 
     def remove_ingredient(self, ingredient_name):
         self.ingredients = [ing for ing in self.ingredients if ing.name != ingredient_name]
@@ -43,66 +49,94 @@ class Inventory:
             report.append(str(ingredient))
         return "\n".join(report)
 
-    def view_inventory(self):
-        for ingredient in self.ingredients:
-            print(f"{ingredient.name}: {ingredient.current_amount}/{ingredient.target_amount}")
+#    def view_inventory(self):
+#        for ingredient in self.ingredients:
+#            print(f"{ingredient.name}: {ingredient.current_amount}/{ingredient.target_amount}")
 
 class UserInterface:
     def __init__(self, root):
         self.root = root
         self.inventory = Inventory()
+        self.user_name = self.get_user_name()
         self.setup_ui()
+
+        self.categories = {
+            "Meats": {
+                "Ham": 4,
+                "Turkey": 4,
+                "Chicken": 2,
+                "Steak": 5
+            },
+            "Vegetables": {
+                "Lettuce": 2,
+                "Tomatoes": 2,
+                "Onions": 4,
+                "Pickles": 2
+            }
+        }
+
+    def get_user_name(self):
+        user_name = simpledialog.askstring("Input", "Enter your name:", parent=self.root)
+        if not user_name:
+            messagebox.showerror("Error", "Name is required to use the application.")
+            self.root.destroy()
+        return user_name
 
     def setup_ui(self):
         self.root.title("Subway Prepped Inventory Manager")
 
-        tk.Button(self.root, text="Add Ingredient", command=self.open_add_ingredient_window).pack(pady=10)
+        tk.Button(self.root, text="Add Ingredient", command=self.open_category_selection_window).pack(pady=10)
         tk.Button(self.root, text="View Inventory", command=self.open_view_inventory_window).pack(pady=10)
         tk.Button(self.root, text="Generate Report", command=self.generate_report).pack(pady=10)
 
-    def open_add_ingredient_window(self):
+    def open_category_selection_window(self):
+        category_window = tk.Toplevel(self.root)
+        category_window.title("Select Ingredient Category")
+
+        tk.Label(category_window, text="Select Ingredient Category:").pack(pady=10)
+
+        for category in self.categories.keys():
+            tk.Button(category_window, text=category, command=lambda cat=category: self.open_ingredient_selection_window(cat)).pack(pady=5)
+
+    def open_ingredient_selection_window(self, category):
+        ingredient_window = tk.Toplevel(self.root)
+        ingredient_window.title(f"Select {category} Ingredient")
+
+        tk.Label(ingredient_window, text=f"Select {category} Ingredient:").pack(pady=10)
+
+        for ingredient, target_amount in self.categories[category].items():
+            tk.Button(ingredient_window, text=ingredient, command=lambda ing=ingredient, target=target_amount: self.open_add_ingredient_window(ing, target)).pack(pady=5)
+
+    def open_add_ingredient_window(self, ingredient_name, target_amount):
         add_window = tk.Toplevel(self.root)
-        add_window.title("Add Ingredient")
+        add_window.title(f"Add {ingredient_name}")
 
-        tk.Label(add_window, text="Ingredient Name:").grid(row=0, column=0, padx=10, pady=5)
-        name_entry = tk.Entry(add_window)
-        name_entry.grid(row=0, column=1, padx=10, pady=5)
+        tk.Label(add_window, text=f"Ingredient: {ingredient_name}").pack(pady=5)
+        tk.Label(add_window, text=f"Target Amount: {target_amount} pans").pack(pady=5)
 
-        tk.Label(add_window, text="Current Amount:").grid(row=1, column=0, padx=10, pady=5)
+        tk.Label(add_window, text="Current Amount (in pans):").pack(pady=5)
         current_amount_entry = tk.Entry(add_window)
-        name_entry.grid(row=0, column=1, padx=10, pady=5)
+        current_amount_entry.pack(pady=5)
 
-        tk.Label(add_window, text="Target Amount:").grid(row=2, column=0, padx=10, pady=5)
-        target_amount_entry = tk.Entry(add_window)
-        name_entry.grid(row=0, column=1, padx=10, pady=5)
+        tk.Label(add_window, text=f"Prepped By: {self.user_name}").pack(pady=5)
 
-        tk.Label(add_window, text="Prepped By:").grid(row=3, column=0, padx=10, pady=5)
-        prepped_by_entry = tk.Entry(add_window)
-        name_entry.grid(row=0, column=1, padx=10, pady=5)
-
-        tk.Label(add_window, text="Waste Amount:").grid(row=4, column=0, padx=10, pady=5)
+        tk.Label(add_window, text="Waste Amount (in pans):").pack(pady=5)
         waste_amount_entry = tk.Entry(add_window)
-        name_entry.grid(row=0, column=1, padx=10, pady=5)
+        waste_amount_entry.pack(pady=5)
 
         def submit():
             try:
-                name = name_entry.get()
                 current_amount = int(current_amount_entry.get())
-                target_amount = int(target_amount_entry.get())
-                prepped_by = prepped_by_entry.get()
                 waste_amount = int(waste_amount_entry.get())
 
-                if not name or not prepped_by:
-                    raise ValueError("Name and Prepped By fields cannot be empty.")
-
-                ingredient = Ingredient(name, current_amount, target_amount, prepped_by, waste_amount)
+                ingredient = Ingredient(ingredient_name, current_amount, target_amount, self.user_name, waste_amount)
                 self.inventory.add_ingredient(ingredient)
-                messagebox.showinfor("Success", "Ingredient added successfully!")
+                messagebox.showinfo("Success", f"{ingredient_name} added/updated successfully!")
                 add_window.destroy()
             except ValueError as e:
                 messagebox.showerror("Error", f"Invalid input: {e}")
 
-        tk.Button(add_window, text="Submit", command=submit).grid(row=5, column=0, columnspan=2, pady=10)
+        tk.Button(add_window, text="Submit", command=submit).pack(pady=10)
 
     def open_view_inventory_window(self):
         view_window = tk.Toplevel(self.root)
@@ -117,10 +151,10 @@ class UserInterface:
         for ingredient in self.inventory.ingredients:
             tree.insert("", "end", values=(
                 ingredient.name,
-                ingredient.current_amount,
-                ingredient.target_amount,
+                f"{ingredient.current_amount} pans",
+                f"{ingredient.target_amount} pans",
                 ingredient.prepped_by,
-                ingredient.waste_amount,
+                f"{ingredient.waste_amount} pans",
                 ingredient.prep_time.strftime("%Y-%m-%d %H:%M:%S")
             ))
 
