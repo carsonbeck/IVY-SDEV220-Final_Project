@@ -58,6 +58,7 @@ class UserInterface:
         self.root = root
         self.inventory = Inventory()
         self.user_name = self.get_user_name()
+        self.current_frame = None
         self.setup_ui()
 
         self.categories = {
@@ -84,66 +85,88 @@ class UserInterface:
 
     def setup_ui(self):
         self.root.title("Subway Prepped Inventory Manager")
+        self.root.geometry("600x400")
 
-        tk.Button(self.root, text="Add Ingredient", command=self.open_category_selection_window).pack(pady=10)
-        tk.Button(self.root, text="View Inventory", command=self.open_view_inventory_window).pack(pady=10)
-        tk.Button(self.root, text="Generate Report", command=self.generate_report).pack(pady=10)
+        self.container = tk.Frame(self.root)
+        self.container.pack(fill="both", expand=True)
 
-    def open_category_selection_window(self):
-        category_window = tk.Toplevel(self.root)
-        category_window.title("Select Ingredient Category")
+        self.show_main_menu()
 
-        tk.Label(category_window, text="Select Ingredient Category:").pack(pady=10)
+    def show_main_menu(self):
+        """Display the main menu."""
+        self.clear_frame()
+        self.current_frame = "main_menu"
+
+        tk.Button(self.container, text="Add Ingredient", command=self.show_category_selection).pack(pady=10)
+        tk.Button(self.container, text="View Inventory", command=self.show_view_inventory).pack(pady=10)
+        tk.Button(self.container, text="Generate Report", command=self.generate_report).pack(pady=10)
+
+    def show_category_selection(self):
+        """Display the category selection screen."""
+        self.clear_frame()
+        self.current_frame = "category_selection"
+
+        tk.Label(self.container, text="Select Ingredient Category:").pack(pady=10)
 
         for category in self.categories.keys():
-            tk.Button(category_window, text=category, command=lambda cat=category: self.open_ingredient_selection_window(cat)).pack(pady=5)
+            tk.Button(self.container, text=category, command=lambda cat=category: self.show_ingredient_selection(cat)).pack(pady=5)
 
-    def open_ingredient_selection_window(self, category):
-        ingredient_window = tk.Toplevel(self.root)
-        ingredient_window.title(f"Select {category} Ingredient")
+        self.add_back_button()
 
-        tk.Label(ingredient_window, text=f"Select {category} Ingredient:").pack(pady=10)
+    def show_ingredient_selection(self, category):
+        """Display the ingredient selection screen for a given category."""
+        self.clear_frame()
+        self.current_frame = "ingredient_selection"
+
+        tk.Label(self.container, text=f"Select {category} Ingredient:").pack(pady=10)
 
         for ingredient, target_amount in self.categories[category].items():
-            tk.Button(ingredient_window, text=ingredient, command=lambda ing=ingredient, target=target_amount: self.open_add_ingredient_window(ing, target)).pack(pady=5)
+            tk.Button(self.container, text=ingredient, command=lambda ing=ingredient, target=target_amount: self.open_add_ingredient(ing, target)).pack(pady=5)
 
-    def open_add_ingredient_window(self, ingredient_name, target_amount):
-        add_window = tk.Toplevel(self.root)
-        add_window.title(f"Add {ingredient_name}")
+        self.add_back_button()
 
-        tk.Label(add_window, text=f"Ingredient: {ingredient_name}").pack(pady=5)
-        tk.Label(add_window, text=f"Target Amount: {target_amount} pans").pack(pady=5)
+    def open_add_ingredient(self, ingredient_name, target_amount):
+        """Display the add ingredient screen."""
+        self.clear_frame()
+        self.current_frame = "add_ingredient"
 
-        tk.Label(add_window, text="Current Amount (in pans):").pack(pady=5)
-        current_amount_entry = tk.Entry(add_window)
-        current_amount_entry.pack(pady=5)
+        tk.Label(self.container, text=f"Ingredient: {ingredient_name}").pack(pady=5)
+        tk.Label(self.container, text=f"Target Amount: {target_amount} pans").pack(pady=5)
 
-        tk.Label(add_window, text=f"Prepped By: {self.user_name}").pack(pady=5)
+        tk.Label(self.container, text="Current Amount (in pans):").pack(pady=5)
+        self.current_amount_entry = tk.Entry(self.container)
+        self.current_amount_entry.pack(pady=5)
 
-        tk.Label(add_window, text="Waste Amount (in pans):").pack(pady=5)
-        waste_amount_entry = tk.Entry(add_window)
-        waste_amount_entry.pack(pady=5)
+        tk.Label(self.container, text=f"Prepped By: {self.user_name}").pack(pady=5)
 
-        def submit():
-            try:
-                current_amount = int(current_amount_entry.get())
-                waste_amount = int(waste_amount_entry.get())
+        tk.Label(self.container, text="Waste Amount (in pans):").pack(pady=5)
+        self.waste_amount_entry = tk.Entry(self.container)
+        self.waste_amount_entry.pack(pady=5)
 
-                ingredient = Ingredient(ingredient_name, current_amount, target_amount, self.user_name, waste_amount)
-                self.inventory.add_ingredient(ingredient)
-                messagebox.showinfo("Success", f"{ingredient_name} added/updated successfully!")
-                add_window.destroy()
-            except ValueError as e:
-                messagebox.showerror("Error", f"Invalid input: {e}")
+        tk.Button(self.container,text="Submit", command=lambda: self.submit_ingredient(ingredient_name, target_amount)).pack(pady=10)
 
-        tk.Button(add_window, text="Submit", command=submit).pack(pady=10)
+        self.add_back_button()
 
-    def open_view_inventory_window(self):
-        view_window = tk.Toplevel(self.root)
-        view_window.title("View Inventory")
+    def submit_ingredient(self, ingredient_name, target_amount):
+        """Handle the submission of a new ingredient."""
+        try:
+            current_amount = int(self.current_amount_entry.get())
+            waste_amount = int(self.waste_amount_entry.get())
+
+            ingredient = Ingredient(ingredient_name, current_amount, target_amount, self.user_name, waste_amount)
+            self.inventory.add_ingredient(ingredient)
+            messagebox.showinfo("Success", f"{ingredient_name} added/updated successfully!")
+            self.show_main_menu()
+        except ValueError as e:
+            messagebox.showerror("Error", f"Invalid input: {e}")
+
+    def show_view_inventory(self):
+        """Display the inventory view."""
+        self.clear_frame()
+        self.current_frame = "view_inventory"
 
         columns = ("Name", "Current Amount", "Target Amount", "Prepped By", "Waste Amount", "Prep Time")
-        tree = ttk.Treeview(view_window, columns=columns, show="headings")
+        tree = ttk.Treeview(self.container, columns=columns, show="headings")
         for col in columns:
             tree.heading(col, text=col)
         tree.pack(padx=10,pady=10)
@@ -158,14 +181,29 @@ class UserInterface:
                 ingredient.prep_time.strftime("%Y-%m-%d %H:%M:%S")
             ))
 
-    def generate_report(self):
-        report = self.inventory.generate_report()
-        report_window = tk.Toplevel(self.root)
-        report_window.title("Inventory Report")
+        self.add_back_button()
 
-        tk.Label(report_window, text="Inventory Report", font=("Arial", 16)).pack(pady=10)
-        tk.Text(report_window).insert(tk.END, report)
-        tk.Button(report_window, text="Close", command=report_window.destroy).pack(pady=10)
+    def generate_report(self):
+        """Display the inventory report."""
+        self.clear_frame()
+        self.current_frame = "generate_report"
+
+        report = self.inventory.generate_report()
+        tk.Label(self.container, text="Inventory Report", font=("Arial", 16)).pack(pady=10)
+        text_widget = tk.Text(self.container)
+        text_widget.insert(tk.END, report)
+        text_widget.pack(pady=10)
+
+        self.add_back_button()
+
+    def add_back_button(self):
+        """Add a Back button to the current frame."""
+        tk.Button(self.container, text="Back", command=self.show_main_menu).pack(pady=10)
+
+    def clear_frame(self):
+        """Clear all widgets from the current frame."""
+        for widget in self.container.winfo_children():
+            widget.destroy()
 
 if __name__ == "__main__":
     root = tk.Tk()
